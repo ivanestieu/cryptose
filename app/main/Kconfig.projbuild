@@ -1,0 +1,11 @@
+menu "CryptoSE tutorial"
+
+    config CRYPTOSE_DIAG_PERIOD_MS
+        int "Diagnostic sampling period (ms)"
+        range 100 5000
+        default 1000
+        help
+            Delay between two diagnostic snapshots. Keep the range short enough
+            for the tutorial monitor while avoiding a busy loop.
+
+endmenu
