@@ -1,0 +1,28 @@
+CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_240=y
+# Smallest flash in the board fleet (classic ESP32): a bigger header makes the
+# app abort at boot on a 4 MB chip. The target comes from `idf.py set-target`.
+CONFIG_ESPTOOLPY_FLASHSIZE_4MB=y
+CONFIG_ESP_MAIN_TASK_STACK_SIZE=24576
+CONFIG_APP_RETRIEVE_LEN_ELF_SHA=64
+CONFIG_PM_ENABLE=n
+CONFIG_COMPILER_OPTIMIZATION_PERF=y
+# mbedtls has its own optimisation choice, -Os by default: measure it at -O2 like the app.
+CONFIG_MBEDTLS_COMPILER_OPTIMIZATION_PERF=y
+# No path, date or time in the binary: the grader rebuilds the submitted sources and
+# compares the ELF SHA-256 that every capture prints.
+CONFIG_APP_REPRODUCIBLE_BUILD=y
+# Without this, PROJECT_VER comes from `git describe` when the project sits in a repository,
+# and the rebuilt ELF differs from the one the captures name.
+CONFIG_APP_PROJECT_VER_FROM_CONFIG=y
+CONFIG_APP_PROJECT_VER="tp2"
+CONFIG_MBEDTLS_HARDWARE_AES=y
+CONFIG_MBEDTLS_HARDWARE_SHA=y
+# CONFIG_MBEDTLS_HARDWARE_RSA_DS_PERIPHERAL is not set
+# CONFIG_GDMA_CTRL_FUNC_IN_IRAM is not set
+CONFIG_CRYPTOSE_BENCHMARK_ITERATIONS=32
+CONFIG_CRYPTOSE_BENCHMARK_WARMUP_ITERATIONS=3
+CONFIG_CRYPTOSE_BENCHMARK_PAYLOAD_BYTES=1024
+CONFIG_CRYPTOSE_BENCHMARK_CORE=1
+CONFIG_CRYPTOSE_BENCHMARK_TASK_STACK_BYTES=16384
+CONFIG_CRYPTOSE_PROFILE_ID="baseline"
+# CONFIG_CRYPTOSE_ENABLE_CHACHA20_POLY1305 is not set

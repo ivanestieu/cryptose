@@ -1,0 +1,55 @@
+menu "CryptoSE TP2 benchmark"
+
+    config CRYPTOSE_BENCHMARK_ITERATIONS
+        int "Nombre d'itérations par mesure"
+        range 1 256
+        default 32
+        help
+            Nombre d'échantillons tentés pour chaque cas. La correction et le
+            préchauffage sont testés séparément avant cette boucle.
+
+    config CRYPTOSE_BENCHMARK_WARMUP_ITERATIONS
+        int "Nombre d'itérations de préchauffage"
+        range 1 32
+        default 3
+        help
+            Exécutions non chronométrées avant chaque série de mesures.
+
+    config CRYPTOSE_BENCHMARK_PAYLOAD_BYTES
+        int "Taille du payload pour les primitives octet"
+        range 16 4096
+        default 1024
+        help
+            Taille utilisée par AES-GCM, SHA-256, HMAC-SHA-256, ECDSA et le
+            profil optionnel ChaCha20-Poly1305.
+
+    config CRYPTOSE_ENABLE_CHACHA20_POLY1305
+        bool "Inclure le profil ChaCha20-Poly1305"
+        default n
+        help
+            Profil comparatif explicitement exclu du build de référence.
+            Utiliser le fichier de profil fourni pour l'activer.
+
+    config CRYPTOSE_PROFILE_ID
+        string "Identifiant reproductible du profil"
+        default "baseline"
+        help
+            Identifiant émis dans les métadonnées JSONL. Les fichiers de
+            profils fournis verrouillent sa valeur.
+
+    config CRYPTOSE_BENCHMARK_CORE
+        int "Cœur réservé à la tâche de benchmark"
+        range 0 1
+        default 1
+        help
+            Chaque cas est exécuté dans une tâche fraîche épinglée sur ce cœur.
+
+    config CRYPTOSE_BENCHMARK_TASK_STACK_BYTES
+        int "Stack identique pour chaque cas, en octets"
+        range 8192 32768
+        default 16384
+        help
+            Taille de stack passée à xTaskCreatePinnedToCore. La mesure du
+            high-water mark est déjà fournie en octets par ESP-IDF.
+
+endmenu

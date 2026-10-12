@@ -1,0 +1,3 @@
+# Profil de référence: la matrice minimale uniquement.
+CONFIG_CRYPTOSE_PROFILE_ID="baseline"
+# CONFIG_CRYPTOSE_ENABLE_CHACHA20_POLY1305 is not set

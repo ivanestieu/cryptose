@@ -1,0 +1,7 @@
+/build/
+/build-*/
+/sdkconfig
+/sdkconfig.old
+/*.jsonl
+__pycache__/
+.ruff_cache/

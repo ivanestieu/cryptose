@@ -1,0 +1,5 @@
+# Profil comparatif explicite; il modifie la surface cryptographique du binaire.
+CONFIG_CRYPTOSE_PROFILE_ID="chacha20-poly1305"
+CONFIG_CRYPTOSE_ENABLE_CHACHA20_POLY1305=y
+CONFIG_MBEDTLS_CHACHA20_C=y
+CONFIG_MBEDTLS_CHACHAPOLY_C=y
