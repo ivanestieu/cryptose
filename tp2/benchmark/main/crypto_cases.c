@@ -25,24 +25,29 @@
 static uint8_t s_payload[CONFIG_CRYPTOSE_BENCHMARK_PAYLOAD_BYTES];
 static uint32_t s_nonce_counter = 0;
 
-#define CHECKED_KEY_INIT(attributes, key_id, status, KEY_TYPE, KEY_BITS, KEY_USAGE, KEY_ALGORITHM, KEY_FIXTURE) psa_set_key_type(&attributes, KEY_TYPE); \
+#define ATTRIBUTE_INIT(attributes, status, KEY_TYPE, KEY_BITS, KEY_USAGE, KEY_ALGORITHM) psa_set_key_type(&attributes, KEY_TYPE); \
     psa_set_key_bits(&attributes, KEY_BITS); \
     psa_set_key_usage_flags(&attributes, KEY_USAGE); \
-    psa_set_key_algorithm(&attributes, KEY_ALGORITHM); \
+    psa_set_key_algorithm(&attributes, KEY_ALGORITHM);
+#define KEY_INIT(attributes, key_id, status, KEY_TYPE, KEY_BITS, KEY_USAGE, KEY_ALGORITHM, KEY_FIXTURE) \
+    ATTRIBUTE_INIT(attributes, status, KEY_TYPE, KEY_BITS, KEY_USAGE, KEY_ALGORITHM) \
     status = psa_import_key( \
          &attributes, \
          KEY_FIXTURE, \
          sizeof(KEY_FIXTURE), \
          &key_id \
-    ); \
-    psa_reset_key_attributes(&attributes); \
+    );
+#define CLEAN_STATUS_CHECK(status, key_id) \
     if (status != PSA_SUCCESS) { \
         if (key_id != 0) { \
             psa_destroy_key(key_id); \
         } \
         return status; \
-    } \
-
+    }
+#define CHECKED_KEY_INIT(attributes, key_id, status, KEY_TYPE, KEY_BITS, KEY_USAGE, KEY_ALGORITHM, KEY_FIXTURE) \
+    KEY_INIT(attributes, key_id, status, KEY_TYPE, KEY_BITS, KEY_USAGE, KEY_ALGORITHM, KEY_FIXTURE) \
+    psa_reset_key_attributes(&attributes); \
+    CLEAN_STATUS_CHECK(status, key_id)
 #define CHECKED_ENCRYPT_OR_DECRYPT(MODE, status, key_id, ALGORITHM, NONCE, AAD, PAYLOAD, CIPHER, cipher_len)  status = psa_aead_##MODE( \
         key_id, \
         ALGORITHM, \
@@ -56,14 +61,7 @@ static uint32_t s_nonce_counter = 0;
         sizeof(CIPHER), \
         &cipher_len \
     ); \
-     \
-    if (status != PSA_SUCCESS) { \
-        if (key_id != 0) { \
-            psa_destroy_key(key_id); \
-        } \
-        return status; \
-    } \
-
+     CLEAN_STATUS_CHECK(status, key_id)
 #define CHECKED_ENCRYPT(status, key_id, ALGORITHM, NONCE, AAD, PAYLOAD, CIPHER, cipher_len) \
     CHECKED_ENCRYPT_OR_DECRYPT(encrypt, status, key_id, ALGORITHM, NONCE, AAD, PAYLOAD, CIPHER, cipher_len)
 #define CHECKED_DECRYPT(status, key_id, ALGORITHM, NONCE, AAD, CIPHER, PLAIN, cipher_len) \
@@ -112,7 +110,7 @@ static psa_status_t run_aes_256_gcm(void) {
     size_t cipher_len = 0;
     size_t decrypt_len = 0;
 
-    CHECKED_KEY_INIT(attributes, key_id, status, PSA_KEY_TYPE_AES, 256, PSA_KEY_USAGE_ENCRYPT | PSA_KEY_USAGE_DECRYPT, PSA_ALG_GCM, FIXTURE_AES_KEY);
+    KEY_INIT(attributes, key_id, status, PSA_KEY_TYPE_AES, 256, PSA_KEY_USAGE_ENCRYPT | PSA_KEY_USAGE_DECRYPT, PSA_ALG_GCM, FIXTURE_AES_KEY);
 
     memcpy(nonce, FIXTURE_NONCE_PREFIX, sizeof(FIXTURE_NONCE_PREFIX));
 
@@ -218,7 +216,6 @@ static psa_status_t verify_chacha20_poly1305(void) {
 static psa_status_t run_hmac_sha_256(void) {
     /* TODO_STUDENT: import KAT_HMAC_KEY as a PSA_KEY_TYPE_HMAC key (usage SIGN_MESSAGE), MAC s_payload,
        destroy the key. */
-
     psa_status_t status = PSA_SUCCESS;
     psa_key_id_t key_id = 0;
     struct psa_key_attributes_s attributes = PSA_KEY_ATTRIBUTES_INIT;
@@ -284,15 +281,124 @@ static psa_status_t verify_hmac_sha_256(void) {
 }
 
 /* ---- ECDH P-256 and X25519: two key generations + two raw agreements that must agree. ---- */
+#define CLEAN_STATUS_CHECK_TWO_KEYS(status, key_a, key_b) if (status != PSA_SUCCESS) { \
+        if (key_a != 0) { \
+            psa_destroy_key(key_b); \
+        } \
+        if (key_b != 0) { \
+            psa_destroy_key(key_b); \
+        } \
+        return status; \
+    }
+
+static inline psa_status_t run_ecdh(uint8_t *pub_a, const size_t pub_a_size, uint8_t *pub_b, const size_t pub_b_size, const psa_ecc_family_t psa_ecc_family, const size_t key_size) {
+    psa_status_t status = PSA_SUCCESS;
+    psa_key_id_t key_a = 0;
+    psa_key_id_t key_b = 0;
+    struct psa_key_attributes_s attributes = PSA_KEY_ATTRIBUTES_INIT;
+
+    uint8_t secret_a[32];
+    uint8_t secret_b[32];
+
+    size_t pub_a_len = 0;
+    size_t pub_b_len = 0;
+    size_t secret_a_len = 0;
+    size_t secret_b_len = 0;
+
+    ATTRIBUTE_INIT(attributes, status, PSA_KEY_TYPE_ECC_KEY_PAIR(psa_ecc_family), key_size, PSA_KEY_USAGE_DERIVE, PSA_ALG_ECDH);
+    ATTRIBUTE_INIT(attributes, status, PSA_KEY_TYPE_ECC_KEY_PAIR(psa_ecc_family), key_size, PSA_KEY_USAGE_DERIVE, PSA_ALG_ECDH);
+
+    status = psa_generate_key(&attributes, &key_a);
+    CLEAN_STATUS_CHECK(status, key_a);
+    status = psa_generate_key(&attributes, &key_b);
+    CLEAN_STATUS_CHECK_TWO_KEYS(status, key_a, key_b);
+
+    psa_reset_key_attributes(&attributes);
+    status = psa_export_public_key(
+         key_a,
+         pub_a,
+         pub_a_size,
+         &pub_a_len
+    );
+
+    CLEAN_STATUS_CHECK_TWO_KEYS(status, key_a, key_b);
+
+    status = psa_export_public_key(
+         key_b,
+         pub_b,
+         pub_b_size,
+         &pub_b_len
+    );
+
+    if (status != PSA_SUCCESS) {
+        if (key_a != 0) {
+            psa_destroy_key(key_b);
+        }
+        if (key_b != 0) {
+            psa_destroy_key(key_b);
+        }
+        return status;
+    }
+
+    status = psa_raw_key_agreement(
+       PSA_ALG_ECDH,
+       key_a,
+       pub_b,
+       pub_b_len,
+       secret_a,
+       sizeof(secret_a),
+       &secret_a_len
+   );
+
+    CLEAN_STATUS_CHECK_TWO_KEYS(status, key_a, key_b);
+
+    status = psa_raw_key_agreement(
+        PSA_ALG_ECDH,
+        key_b,
+        pub_a,
+        pub_b_len,
+        secret_b,
+        sizeof(secret_b),
+        &secret_b_len
+    );
+
+    CLEAN_STATUS_CHECK_TWO_KEYS(status, key_a, key_b);
+
+    if (secret_a_len != secret_b_len || memcmp(secret_a, secret_b, secret_a_len) != 0) {
+        status = PSA_ERROR_INVALID_SIGNATURE;
+    }
+
+    if (key_a != 0) {
+        const psa_status_t destroy_status = psa_destroy_key(key_a);
+        if (status == PSA_SUCCESS) {
+            status = destroy_status;
+        }
+    }
+
+    if (key_b != 0) {
+        const psa_status_t destroy_status = psa_destroy_key(key_b);
+        if (status == PSA_SUCCESS) {
+            status = destroy_status;
+        }
+    }
+
+    return status;
+}
+#undef CLEAN_STATUS_CHECK_TWO_KEYS
 
 static psa_status_t run_ecdh_p256(void) {
     /* TODO_STUDENT: generate two key pairs (PSA_ECC_FAMILY_SECP_R1, 256 bits, usage DERIVE, PSA_ALG_ECDH),
        export both public keys, compute both raw agreements, check they are equal, destroy both keys. */
-    return PSA_ERROR_NOT_SUPPORTED;
+    uint8_t pub_a[65];
+    uint8_t pub_b[65];
+    return run_ecdh(pub_a, sizeof(pub_a), pub_b, sizeof(pub_b), PSA_ECC_FAMILY_SECP_R1, 256);
 }
 
 static psa_status_t run_x25519(void) {
     /* TODO_STUDENT: the same with PSA_ECC_FAMILY_MONTGOMERY, 255 bits. */
+    uint8_t pub_a[32];
+    uint8_t pub_b[32];
+    return run_ecdh(pub_a, sizeof(pub_a), pub_b, sizeof(pub_b), PSA_ECC_FAMILY_MONTGOMERY, 255);
     return PSA_ERROR_NOT_SUPPORTED;
 }
 
